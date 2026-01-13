@@ -132,7 +132,7 @@ class SlideEditor {
         try {
             // 使用 AbortController 设置超时
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟超时
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5分钟超时
 
             const response = await fetch('/api/upload', {
                 method: 'POST',
