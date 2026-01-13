@@ -102,19 +102,47 @@ class SlideEditor {
     }
 
     async uploadFile(file) {
+        // 文件大小检查 (限制 100MB)
+        const maxSize = 100 * 1024 * 1024;
+        if (file.size > maxSize) {
+            alert(`错误: 文件太大 (${(file.size / 1024 / 1024).toFixed(1)}MB)。请上传小于 100MB 的 PDF 文件。`);
+            return;
+        }
+
+        // 文件名清理：处理中文和特殊字符
+        let safeFile = file;
+        const originalName = file.name;
+
+        // 如果文件名包含非 ASCII 字符，创建一个新的 File 对象
+        if (/[^\x00-\x7F]/.test(originalName)) {
+            // 保留原始扩展名，使用时间戳作为安全文件名
+            const safeName = `upload_${Date.now()}.pdf`;
+            safeFile = new File([file], safeName, { type: file.type });
+            console.log(`文件名已转换: ${originalName} -> ${safeName}`);
+        }
+
         this.uploadLoading.classList.remove('hidden');
 
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', safeFile);
+
+        // 添加原始文件名作为额外字段
+        formData.append('original_filename', originalName);
 
         try {
+            // 使用 AbortController 设置超时
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟超时
+
             const response = await fetch('/api/upload', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
 
+            clearTimeout(timeoutId);
+
             if (!response.ok) {
-                // 尝试获取详细错误信息
                 let errorMsg = '上传失败';
                 try {
                     const errData = await response.json();
@@ -135,7 +163,11 @@ class SlideEditor {
             this.updateStats();
 
         } catch (error) {
-            alert('错误: ' + error.message);
+            if (error.name === 'AbortError') {
+                alert('错误: 上传超时，请检查网络连接后重试。');
+            } else {
+                alert('错误: ' + error.message);
+            }
         } finally {
             this.uploadLoading.classList.add('hidden');
         }

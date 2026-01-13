@@ -73,7 +73,7 @@ async def index():
 
 
 @app.post("/api/upload")
-async def upload_pdf(file: UploadFile = File(...), remove_watermark: bool = Form(False)):
+async def upload_pdf(file: UploadFile = File(...), remove_watermark: bool = Form(False), original_filename: Optional[str] = Form(None)):
     """上传 PDF 并转换为图片"""
     import traceback
     import logging
@@ -129,9 +129,11 @@ async def upload_pdf(file: UploadFile = File(...), remove_watermark: bool = Form
         
         # 保存会话信息
         import json
+        # 使用原始文件名（如果前端传了的话），否则用上传的文件名
+        display_filename = original_filename or file.filename
         session_info = {
             "id": session_id,
-            "filename": file.filename,
+            "filename": display_filename,
             "pages": pages,
             "remove_watermark": remove_watermark
         }
