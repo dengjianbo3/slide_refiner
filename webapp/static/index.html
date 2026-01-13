@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slide Refiner</title>
+    <link rel="stylesheet" href="/static/style.css?v=5.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Upload View -->
+    <div id="view-upload" class="view-upload">
+        <div class="upload-card" id="drop-zone">
+            <h1 class="brand-title">Slide Refiner</h1>
+            <p class="upload-hint">AI 驱动的专业幻灯片增强工具</p>
+            <div class="upload-icon">
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <path d="M12 18v-6" />
+                    <path d="M9 15l3-3 3 3" />
+                </svg>
+            </div>
+            <p class="upload-hint">点击或拖拽 PDF 文件至此处</p>
+            <input type="file" id="file-input" accept=".pdf" hidden>
+            <div id="upload-loading" class="hidden" style="margin-top: 1.5rem;">
+                <div class="loading-spinner" style="margin: 0 auto;"></div>
+                <p style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--text-muted);">正在处理...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workspace View -->
+    <div id="view-workspace" class="view-workspace hidden">
+
+        <!-- Left Sidebar -->
+        <aside class="sidebar-left">
+            <div class="brand-header">
+                <h2>Slide Refiner</h2>
+                <p>Workspace</p>
+            </div>
+            <div class="thumbnails-list" id="thumbnails-list"></div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <img id="preview-img" src="" alt="Slide Preview">
+            <div class="stage-toolbar">
+                <button id="btn-prev" class="nav-btn">←</button>
+                <span id="page-counter" class="page-counter">1 / 1</span>
+                <button id="btn-next" class="nav-btn">→</button>
+            </div>
+        </main>
+
+        <!-- Right Sidebar -->
+        <aside class="sidebar-right">
+            <div class="inspector-section">
+                <h3>当前页面</h3>
+                <div class="info-row">
+                    <span>页码</span>
+                    <span id="info-page-num">1</span>
+                </div>
+                <div class="info-row">
+                    <span>状态</span>
+                    <span id="info-status" class="status-tag">未处理</span>
+                </div>
+            </div>
+            <div class="inspector-section">
+                <h3>AI 增强</h3>
+                <textarea id="input-prompt" class="prompt-box" placeholder="输入自定义指令...&#10;例如：改为深色模式"></textarea>
+                <div class="action-grid">
+                    <button id="btn-enhance" class="btn btn-primary">✨ 增强</button>
+                    <button id="btn-reset" class="btn btn-secondary">↺ 重置</button>
+                </div>
+            </div>
+            <div class="inspector-section" style="margin-top: auto;">
+                <h3>批量处理</h3>
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                    完成所有单页修改后，点击下方按钮一键增强全部页面</p>
+                <label class="checkbox-wrapper" style="justify-content: flex-start; margin-bottom: 0.75rem;">
+                    <input type="checkbox" id="remove-watermark">
+                    <span>移除 NotebookLM 水印</span>
+                </label>
+                <button id="btn-enhance-all" class="btn btn-primary" style="margin-bottom: 0.75rem;">✨ 批量增强所有页面</button>
+            </div>
+            <div class="inspector-section">
+                <h3>导出</h3>
+                <div class="info-row" style="margin-bottom: 0.75rem;">
+                    <span>进度</span>
+                    <span><span id="stat-done">0</span> / <span id="stat-total">0</span></span>
+                </div>
+                <button id="btn-export-pdf" class="btn btn-export">导出 PDF</button>
+                <button id="btn-export-pptx" class="btn btn-export">导出 PPTX</button>
+                <button id="btn-new-project" class="btn btn-secondary" style="margin-top: 0.75rem;">关闭项目</button>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-veil" class="loading-veil hidden">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <script src="/static/app.js?v=5.0"></script>
+</body>
+
+</html>

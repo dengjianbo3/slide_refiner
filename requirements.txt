@@ -1,0 +1,19 @@
+# Core AI
+google-genai
+
+# PDF Processing
+pdf2image
+Pillow
+img2pdf
+
+# Web Framework
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+
+# HTTP Client
+httpx
+
+# PPTX Export
+python-pptx
