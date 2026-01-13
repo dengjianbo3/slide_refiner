@@ -75,52 +75,77 @@ async def index():
 @app.post("/api/upload")
 async def upload_pdf(file: UploadFile = File(...), remove_watermark: bool = Form(False)):
     """上传 PDF 并转换为图片"""
+    import traceback
+    import logging
+    
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"收到上传请求: {file.filename}, 大小: {file.size if hasattr(file, 'size') else 'unknown'}")
+    
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="请上传 PDF 文件")
     
-    # 创建会话
-    session_id = str(uuid.uuid4())[:8]
-    session_dir = SESSIONS_DIR / session_id
-    session_dir.mkdir(exist_ok=True)
-    
-    # 保存 PDF
-    pdf_path = session_dir / "original.pdf"
-    with open(pdf_path, "wb") as f:
+    try:
+        # 创建会话
+        session_id = str(uuid.uuid4())[:8]
+        session_dir = SESSIONS_DIR / session_id
+        session_dir.mkdir(exist_ok=True)
+        logger.info(f"创建会话目录: {session_dir}")
+        
+        # 保存 PDF
+        pdf_path = session_dir / "original.pdf"
         content = await file.read()
-        f.write(content)
+        logger.info(f"读取文件内容: {len(content)} 字节")
+        
+        with open(pdf_path, "wb") as f:
+            f.write(content)
+        logger.info(f"PDF 保存成功: {pdf_path}")
+        
+        # 转换为图片
+        images_dir = session_dir / "original"
+        images_dir.mkdir(exist_ok=True)
+        
+        try:
+            images = convert_from_path(str(pdf_path), dpi=200)
+            logger.info(f"PDF 转换成功: {len(images)} 页")
+        except Exception as e:
+            logger.error(f"PDF 转换失败: {e}")
+            raise HTTPException(status_code=500, detail=f"PDF 转换失败: {str(e)}。请确保服务器已安装 poppler")
+        
+        pages = []
+        for i, img in enumerate(images):
+            img_path = images_dir / f"page_{i+1:03d}.png"
+            img.save(str(img_path), "PNG")
+            pages.append({
+                "id": i + 1,
+                "original": f"/api/sessions/{session_id}/original/{i+1}",
+                "enhanced": None,
+                "status": "pending"
+            })
+        
+        # 创建增强图片目录
+        (session_dir / "enhanced").mkdir(exist_ok=True)
+        
+        # 保存会话信息
+        import json
+        session_info = {
+            "id": session_id,
+            "filename": file.filename,
+            "pages": pages,
+            "remove_watermark": remove_watermark
+        }
+        with open(session_dir / "session.json", "w") as f:
+            json.dump(session_info, f)
+        
+        logger.info(f"会话创建成功: {session_id}, 共 {len(pages)} 页")
+        return {"session_id": session_id, "pages": pages, "total": len(pages)}
     
-    # 转换为图片
-    images_dir = session_dir / "original"
-    images_dir.mkdir(exist_ok=True)
-    
-    images = convert_from_path(str(pdf_path), dpi=200)
-    pages = []
-    
-    for i, img in enumerate(images):
-        img_path = images_dir / f"page_{i+1:03d}.png"
-        img.save(str(img_path), "PNG")
-        pages.append({
-            "id": i + 1,
-            "original": f"/api/sessions/{session_id}/original/{i+1}",
-            "enhanced": None,
-            "status": "pending"
-        })
-    
-    # 创建增强图片目录
-    (session_dir / "enhanced").mkdir(exist_ok=True)
-    
-    # 保存会话信息
-    import json
-    session_info = {
-        "id": session_id,
-        "filename": file.filename,
-        "pages": pages,
-        "remove_watermark": remove_watermark
-    }
-    with open(session_dir / "session.json", "w") as f:
-        json.dump(session_info, f)
-    
-    return {"session_id": session_id, "pages": pages, "total": len(pages)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"上传处理失败: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"服务器处理失败: {str(e)}")
 
 
 @app.get("/api/sessions/{session_id}")

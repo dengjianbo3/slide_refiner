@@ -106,7 +106,6 @@ class SlideEditor {
 
         const formData = new FormData();
         formData.append('file', file);
-        // No watermark option during upload anymore
 
         try {
             const response = await fetch('/api/upload', {
@@ -114,7 +113,17 @@ class SlideEditor {
                 body: formData
             });
 
-            if (!response.ok) throw new Error('Failed to upload');
+            if (!response.ok) {
+                // 尝试获取详细错误信息
+                let errorMsg = '上传失败';
+                try {
+                    const errData = await response.json();
+                    errorMsg = errData.detail || errorMsg;
+                } catch (e) {
+                    errorMsg = `服务器错误 (${response.status})`;
+                }
+                throw new Error(errorMsg);
+            }
 
             const data = await response.json();
             this.sessionId = data.session_id;
@@ -126,7 +135,7 @@ class SlideEditor {
             this.updateStats();
 
         } catch (error) {
-            alert('Error: ' + error.message);
+            alert('错误: ' + error.message);
         } finally {
             this.uploadLoading.classList.add('hidden');
         }
