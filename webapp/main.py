@@ -430,6 +430,152 @@ async def reset_page(session_id: str, page_id: int):
     return {"success": True, "original": f"/api/sessions/{session_id}/original/{page_id}"}
 
 
+# ============== 模板背景功能 ==============
+
+@app.post("/api/sessions/{session_id}/template")
+async def upload_template(session_id: str, file: UploadFile = File(...)):
+    """上传模板背景图片"""
+    session_dir = get_session_dir(session_id)
+    if not session_dir.exists():
+        raise HTTPException(status_code=404, detail="会话不存在")
+    
+    # 验证文件类型
+    allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="请上传 PNG、JPG 或 WebP 格式的图片")
+    
+    # 保存模板图片
+    template_path = session_dir / "template.png"
+    content = await file.read()
+    
+    # 转换为 PNG 格式保存
+    from io import BytesIO
+    img = Image.open(BytesIO(content))
+    img.save(str(template_path), "PNG")
+    
+    return {"success": True, "template": f"/api/sessions/{session_id}/template"}
+
+
+@app.get("/api/sessions/{session_id}/template")
+async def get_template(session_id: str):
+    """获取模板背景图片"""
+    session_dir = get_session_dir(session_id)
+    template_path = session_dir / "template.png"
+    
+    if not template_path.exists():
+        raise HTTPException(status_code=404, detail="模板不存在")
+    
+    return FileResponse(str(template_path), media_type="image/png")
+
+
+@app.delete("/api/sessions/{session_id}/template")
+async def delete_template(session_id: str):
+    """删除模板背景图片"""
+    session_dir = get_session_dir(session_id)
+    template_path = session_dir / "template.png"
+    
+    if template_path.exists():
+        template_path.unlink()
+    
+    return {"success": True}
+
+
+@app.post("/api/sessions/{session_id}/apply-template/{page_id}")
+async def apply_template(session_id: str, page_id: int):
+    """应用模板背景到指定页面"""
+    import json
+    
+    session_dir = get_session_dir(session_id)
+    if not session_dir.exists():
+        raise HTTPException(status_code=404, detail="会话不存在")
+    
+    template_path = session_dir / "template.png"
+    if not template_path.exists():
+        raise HTTPException(status_code=400, detail="请先上传模板背景图片")
+    
+    original_path = session_dir / "original" / f"page_{page_id:03d}.png"
+    if not original_path.exists():
+        raise HTTPException(status_code=404, detail="原始页面不存在")
+    
+    enhanced_path = session_dir / "enhanced" / f"page_{page_id:03d}.png"
+    
+    # 加载图片
+    template_image = Image.open(str(template_path))
+    slide_image = Image.open(str(original_path))
+    
+    # 检测宽高比
+    aspect_ratio = detect_aspect_ratio(slide_image)
+    
+    # 设计专门的模板融合 Prompt
+    prompt = """You are a professional slide designer. I am providing TWO images:
+
+IMAGE 1 (TEMPLATE): A background template with design elements, colors, and styling.
+IMAGE 2 (ORIGINAL SLIDE): A presentation slide with text, charts, diagrams, and content.
+
+YOUR TASK:
+1. EXTRACT all textual content, charts, diagrams, tables, and visual elements from the ORIGINAL SLIDE
+2. RECREATE these elements onto the TEMPLATE background
+3. ADAPT colors, fonts, and styling to harmonize with the template's design language
+4. MAINTAIN the logical layout, hierarchy, and readability of information
+5. ENSURE all text remains crisp, clear, and professional
+6. PRESERVE the exact content - do not add, remove, or change any information
+
+OUTPUT: A single, beautifully merged slide at maximum resolution.
+
+Important: The final slide should look like a professionally designed presentation that uses the template's visual style while displaying all the original content."""
+
+    try:
+        client = get_gemini_client()
+        
+        # Gemini 3 Pro 支持多图片输入
+        response = client.models.generate_content(
+            model="gemini-3-pro-image-preview",
+            contents=[prompt, template_image, slide_image],
+            config=types.GenerateContentConfig(
+                response_modalities=['TEXT', 'IMAGE'],
+                image_config=types.ImageConfig(
+                    aspect_ratio=aspect_ratio,
+                    image_size="4K"
+                ),
+            )
+        )
+        
+        if response is None or response.parts is None:
+            raise HTTPException(status_code=500, detail="API 返回空响应")
+        
+        saved = False
+        for part in response.parts:
+            if hasattr(part, 'thought') and part.thought:
+                continue
+            if part.inline_data is not None:
+                merged_image = part.as_image()
+                merged_image.save(str(enhanced_path))
+                saved = True
+        
+        if not saved:
+            raise HTTPException(status_code=500, detail="未返回合成图片")
+        
+        # 更新会话状态
+        with open(session_dir / "session.json") as f:
+            session = json.load(f)
+        
+        for page in session["pages"]:
+            if page["id"] == page_id:
+                page["enhanced"] = f"/api/sessions/{session_id}/enhanced/{page_id}"
+                page["status"] = "done"
+                break
+        
+        with open(session_dir / "session.json", "w") as f:
+            json.dump(session, f)
+        
+        return {"success": True, "enhanced": f"/api/sessions/{session_id}/enhanced/{page_id}"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"模板应用失败: {str(e)}")
+
+
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
     """删除会话"""

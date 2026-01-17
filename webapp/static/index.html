@@ -78,6 +78,29 @@
                     <button id="btn-reset" class="btn btn-secondary">↺ 重置</button>
                 </div>
             </div>
+            <div class="inspector-section">
+                <h3>🎨 模板背景</h3>
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    上传模板背景，AI 将把幻灯片内容融合到模板上</p>
+                <div id="template-zone" class="template-upload-zone">
+                    <input type="file" id="template-input" accept="image/*" hidden>
+                    <div id="template-placeholder" class="template-placeholder">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <path d="M3 15l5-5 4 4 5-5 4 4" />
+                        </svg>
+                        <span>点击上传模板</span>
+                    </div>
+                    <img id="template-preview" class="template-preview hidden" alt="模板预览">
+                </div>
+                <div class="action-grid" style="margin-top: 0.5rem;">
+                    <button id="btn-apply-template" class="btn btn-accent" disabled>应用模板</button>
+                    <button id="btn-clear-template" class="btn btn-secondary" disabled>清除</button>
+                </div>
+                <button id="btn-apply-template-all" class="btn btn-accent" style="margin-top: 0.5rem;" disabled>🎨
+                    应用模板到全部</button>
+            </div>
             <div class="inspector-section" style="margin-top: auto;">
                 <h3>批量处理</h3>
                 <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">

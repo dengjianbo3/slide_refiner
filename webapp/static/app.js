@@ -8,6 +8,7 @@ class SlideEditor {
         this.sessionId = null;
         this.pages = [];
         this.currentPage = 0;
+        this.hasTemplate = false;
 
         this.initElements();
         this.initEventListeners();
@@ -45,6 +46,15 @@ class SlideEditor {
         this.btnExportPdf = document.getElementById('btn-export-pdf');
         this.btnExportPptx = document.getElementById('btn-export-pptx');
         this.btnNewProject = document.getElementById('btn-new-project');
+
+        // Template elements
+        this.templateZone = document.getElementById('template-zone');
+        this.templateInput = document.getElementById('template-input');
+        this.templatePlaceholder = document.getElementById('template-placeholder');
+        this.templatePreview = document.getElementById('template-preview');
+        this.btnApplyTemplate = document.getElementById('btn-apply-template');
+        this.btnClearTemplate = document.getElementById('btn-clear-template');
+        this.btnApplyTemplateAll = document.getElementById('btn-apply-template-all');
     }
 
     initEventListeners() {
@@ -94,6 +104,13 @@ class SlideEditor {
         this.btnExportPdf.addEventListener('click', () => this.exportAs('pdf'));
         this.btnExportPptx.addEventListener('click', () => this.exportAs('pptx'));
         this.btnNewProject.addEventListener('click', () => this.newProject());
+
+        // Template
+        this.templateZone.addEventListener('click', () => this.templateInput.click());
+        this.templateInput.addEventListener('change', (e) => this.handleTemplateSelect(e));
+        this.btnApplyTemplate.addEventListener('click', () => this.applyTemplateToPage());
+        this.btnClearTemplate.addEventListener('click', () => this.clearTemplate());
+        this.btnApplyTemplateAll.addEventListener('click', () => this.applyTemplateToAll());
     }
 
     async handleFileSelect(e) {
@@ -423,6 +440,131 @@ class SlideEditor {
             }
             window.location.reload();
         }
+    }
+
+    // ========== Template Methods ==========
+
+    async handleTemplateSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        this.showVeil(true);
+        try {
+            const res = await fetch(`/api/sessions/${this.sessionId}/template`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || '上传失败');
+            }
+
+            // Show template preview
+            this.templatePlaceholder.classList.add('hidden');
+            this.templatePreview.classList.remove('hidden');
+            this.templatePreview.src = `/api/sessions/${this.sessionId}/template?t=${Date.now()}`;
+            this.hasTemplate = true;
+
+            // Enable buttons
+            this.btnApplyTemplate.disabled = false;
+            this.btnClearTemplate.disabled = false;
+            this.btnApplyTemplateAll.disabled = false;
+
+        } catch (err) {
+            alert('错误: ' + err.message);
+        } finally {
+            this.showVeil(false);
+        }
+    }
+
+    async clearTemplate() {
+        if (!this.sessionId) return;
+
+        await fetch(`/api/sessions/${this.sessionId}/template`, { method: 'DELETE' });
+
+        this.templatePreview.classList.add('hidden');
+        this.templatePlaceholder.classList.remove('hidden');
+        this.templatePreview.src = '';
+        this.hasTemplate = false;
+
+        this.btnApplyTemplate.disabled = true;
+        this.btnClearTemplate.disabled = true;
+        this.btnApplyTemplateAll.disabled = true;
+        this.templateInput.value = '';
+    }
+
+    async applyTemplateToPage() {
+        if (!this.hasTemplate || !this.sessionId) return;
+
+        const page = this.pages[this.currentPage];
+        this.showVeil(true);
+
+        try {
+            const res = await fetch(`/api/sessions/${this.sessionId}/apply-template/${page.id}`, {
+                method: 'POST'
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || '应用失败');
+            }
+
+            const data = await res.json();
+            page.enhanced = data.enhanced;
+            page.status = 'done';
+
+            this.selectPage(this.currentPage);
+            this.refreshThumbnail(this.currentPage);
+            this.updateStats();
+
+        } catch (err) {
+            alert('错误: ' + err.message);
+        } finally {
+            this.showVeil(false);
+        }
+    }
+
+    async applyTemplateToAll() {
+        if (!this.hasTemplate || !this.sessionId) return;
+
+        const pending = this.pages.filter(p => p.status !== 'done');
+        if (pending.length === 0) {
+            if (!confirm('所有页面已处理，是否重新应用模板到全部页面？')) return;
+        } else {
+            if (!confirm(`准备应用模板到 ${this.pages.length} 个页面，确定继续吗？`)) return;
+        }
+
+        this.showVeil(true);
+        this.btnApplyTemplateAll.disabled = true;
+
+        for (let i = 0; i < this.pages.length; i++) {
+            this.selectPage(i);
+
+            try {
+                const res = await fetch(`/api/sessions/${this.sessionId}/apply-template/${this.pages[i].id}`, {
+                    method: 'POST'
+                });
+
+                if (res.ok) {
+                    const d = await res.json();
+                    this.pages[i].enhanced = d.enhanced;
+                    this.pages[i].status = 'done';
+                    this.refreshThumbnail(i);
+                    this.updateStats();
+                }
+            } catch (e) {
+                console.error(`Page ${i + 1} failed:`, e);
+            }
+        }
+
+        this.showVeil(false);
+        this.btnApplyTemplateAll.disabled = false;
+        this.selectPage(0);
+        alert('模板应用完成！');
     }
 }
 
