@@ -434,6 +434,59 @@ body {
     cursor: not-allowed;
 }
 
+/* ===== Extend Inputs ===== */
+.extend-inputs {
+    margin-bottom: 0.5rem;
+}
+
+.input-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.input-row label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.small-input {
+    width: 60px;
+    padding: 0.35rem 0.5rem;
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-main);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.small-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.topic-input {
+    width: 100%;
+    padding: 0.5rem;
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-main);
+    font-size: 0.8rem;
+    margin-top: 0.35rem;
+}
+
+.topic-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.topic-input::placeholder {
+    color: var(--text-faint);
+}
+
 /* ===== Loading ===== */
 .loading-veil {
     position: fixed;

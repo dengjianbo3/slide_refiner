@@ -55,6 +55,11 @@ class SlideEditor {
         this.btnApplyTemplate = document.getElementById('btn-apply-template');
         this.btnClearTemplate = document.getElementById('btn-clear-template');
         this.btnApplyTemplateAll = document.getElementById('btn-apply-template-all');
+
+        // Extend elements
+        this.extendCount = document.getElementById('extend-count');
+        this.extendTopic = document.getElementById('extend-topic');
+        this.btnExtend = document.getElementById('btn-extend');
     }
 
     initEventListeners() {
@@ -111,6 +116,9 @@ class SlideEditor {
         this.btnApplyTemplate.addEventListener('click', () => this.applyTemplateToPage());
         this.btnClearTemplate.addEventListener('click', () => this.clearTemplate());
         this.btnApplyTemplateAll.addEventListener('click', () => this.applyTemplateToAll());
+
+        // Extend
+        this.btnExtend.addEventListener('click', () => this.extendSlides());
     }
 
     async handleFileSelect(e) {
@@ -565,6 +573,68 @@ class SlideEditor {
         this.btnApplyTemplateAll.disabled = false;
         this.selectPage(0);
         alert('模板应用完成！');
+    }
+
+    // ========== Extend Methods ==========
+
+    async extendSlides() {
+        if (!this.sessionId) return;
+
+        const count = parseInt(this.extendCount.value) || 1;
+        const topic = this.extendTopic.value.trim();
+
+        if (count < 1 || count > 10) {
+            alert('新增页数需在 1-10 之间');
+            return;
+        }
+
+        if (!confirm(`将生成 ${count} 个新页面${topic ? '，主题：' + topic : ''}，确定继续吗？`)) {
+            return;
+        }
+
+        this.showVeil(true);
+        this.btnExtend.disabled = true;
+
+        const formData = new FormData();
+        formData.append('count', count);
+        if (topic) {
+            formData.append('topic', topic);
+        }
+
+        try {
+            const res = await fetch(`/api/sessions/${this.sessionId}/extend`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || '生成失败');
+            }
+
+            const data = await res.json();
+
+            // 将新页面添加到本地 pages 数组
+            for (const page of data.pages) {
+                this.pages.push(page);
+            }
+
+            // 重新渲染缩略图列表
+            this.renderThumbnails();
+            this.updateStats();
+
+            // 跳转到第一个新生成的页面
+            const firstNewIndex = this.pages.length - data.generated_count;
+            this.selectPage(firstNewIndex);
+
+            alert(`成功生成 ${data.generated_count} 个新页面！`);
+
+        } catch (err) {
+            alert('错误: ' + err.message);
+        } finally {
+            this.showVeil(false);
+            this.btnExtend.disabled = false;
+        }
     }
 }
 

@@ -101,6 +101,22 @@
                 <button id="btn-apply-template-all" class="btn btn-accent" style="margin-top: 0.5rem;" disabled>🎨
                     应用模板到全部</button>
             </div>
+            <div class="inspector-section">
+                <h3>➕ 扩展页面</h3>
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    AI 分析现有风格，生成新页面</p>
+                <div class="extend-inputs">
+                    <div class="input-row">
+                        <label>新增页数</label>
+                        <input type="number" id="extend-count" min="1" max="10" value="1" class="small-input">
+                    </div>
+                    <div class="input-row" style="margin-top: 0.5rem;">
+                        <label>内容主题 (可选)</label>
+                    </div>
+                    <input type="text" id="extend-topic" placeholder="如：市场分析、团队介绍..." class="topic-input">
+                </div>
+                <button id="btn-extend" class="btn btn-accent" style="margin-top: 0.75rem;">➕ 生成新页面</button>
+            </div>
             <div class="inspector-section" style="margin-top: auto;">
                 <h3>批量处理</h3>
                 <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">

@@ -576,6 +576,135 @@ Important: The final slide should look like a professionally designed presentati
         raise HTTPException(status_code=500, detail=f"模板应用失败: {str(e)}")
 
 
+# ============== 页面扩展功能 ==============
+
+@app.post("/api/sessions/{session_id}/extend")
+async def extend_slides(session_id: str, count: int = Form(...), topic: Optional[str] = Form(None)):
+    """扩展幻灯片页面，AI 生成与现有风格一致的新页面"""
+    import json
+    
+    session_dir = get_session_dir(session_id)
+    if not session_dir.exists():
+        raise HTTPException(status_code=404, detail="会话不存在")
+    
+    with open(session_dir / "session.json") as f:
+        session = json.load(f)
+    
+    if len(session["pages"]) == 0:
+        raise HTTPException(status_code=400, detail="没有现有页面作为风格参考")
+    
+    if count < 1 or count > 10:
+        raise HTTPException(status_code=400, detail="新增页数需在 1-10 之间")
+    
+    # 收集风格样本（取前 3-5 张现有幻灯片）
+    sample_count = min(5, len(session["pages"]))
+    sample_images = []
+    
+    for i in range(sample_count):
+        page = session["pages"][i]
+        # 优先使用增强后的版本
+        enhanced_path = session_dir / "enhanced" / f"page_{page['id']:03d}.png"
+        original_path = session_dir / "original" / f"page_{page['id']:03d}.png"
+        img_path = enhanced_path if enhanced_path.exists() else original_path
+        sample_images.append(Image.open(str(img_path)))
+    
+    # 检测宽高比（使用第一张图）
+    aspect_ratio = detect_aspect_ratio(sample_images[0])
+    
+    # 当前最大页码
+    current_max_id = max(p["id"] for p in session["pages"])
+    
+    generated_pages = []
+    
+    try:
+        client = get_gemini_client()
+        
+        for i in range(count):
+            new_page_id = current_max_id + i + 1
+            new_page_num = i + 1
+            
+            # 构建 Prompt
+            topic_instruction = f"\nCONTENT TOPIC for this slide: {topic}" if topic else ""
+            page_context = f"\nThis is page {new_page_num} of {count} new pages being generated." if count > 1 else ""
+            
+            prompt = f"""You are a professional presentation designer. I'm providing {sample_count} sample slides from an existing presentation as STYLE REFERENCE.
+
+YOUR TASK: Generate a BRAND NEW slide that matches the exact visual style of the samples:
+- Same color scheme, gradients, and backgrounds
+- Same typography style, font sizes, and text formatting
+- Same layout patterns, margins, and spacing
+- Same graphic elements, icons, and decorative style
+
+CRITICAL REQUIREMENTS:
+1. The new slide must look like it belongs to the SAME presentation
+2. Generate ACTUAL meaningful content (not placeholders)
+3. Include a title and supporting content (bullet points, graphics, etc.)
+4. Output at maximum resolution{topic_instruction}{page_context}
+
+OUTPUT: A single new presentation slide that seamlessly fits with the provided samples."""
+
+            # 构建内容：Prompt + 所有样本图片
+            contents = [prompt] + sample_images
+            
+            response = client.models.generate_content(
+                model="gemini-3-pro-image-preview",
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_modalities=['TEXT', 'IMAGE'],
+                    image_config=types.ImageConfig(
+                        aspect_ratio=aspect_ratio,
+                        image_size="4K"
+                    ),
+                )
+            )
+            
+            if response is None or response.parts is None:
+                raise HTTPException(status_code=500, detail=f"生成第 {new_page_num} 页时 API 返回空响应")
+            
+            # 保存生成的图片
+            saved = False
+            for part in response.parts:
+                if hasattr(part, 'thought') and part.thought:
+                    continue
+                if part.inline_data is not None:
+                    new_image = part.as_image()
+                    # 保存到 original 目录（因为是新生成的原始页面）
+                    new_img_path = session_dir / "original" / f"page_{new_page_id:03d}.png"
+                    new_image.save(str(new_img_path))
+                    saved = True
+                    break
+            
+            if not saved:
+                raise HTTPException(status_code=500, detail=f"生成第 {new_page_num} 页时未返回图片")
+            
+            # 添加到页面列表
+            new_page = {
+                "id": new_page_id,
+                "original": f"/api/sessions/{session_id}/original/{new_page_id}",
+                "enhanced": None,
+                "status": "pending",
+                "generated": True  # 标记为 AI 生成的页面
+            }
+            session["pages"].append(new_page)
+            generated_pages.append(new_page)
+        
+        # 保存更新后的会话
+        with open(session_dir / "session.json", "w") as f:
+            json.dump(session, f)
+        
+        return {
+            "success": True,
+            "generated_count": len(generated_pages),
+            "pages": generated_pages,
+            "total_pages": len(session["pages"])
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"页面扩展失败: {str(e)}")
+
+
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
     """删除会话"""
