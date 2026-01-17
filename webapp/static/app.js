@@ -366,26 +366,41 @@ class SlideEditor {
         else this.loadingVeil.classList.add('hidden');
     }
 
-    async enhanceAllPages() {
-        const pending = this.pages.filter(p => p.status !== 'done');
-        if (pending.length === 0) {
-            alert('所有页面已处理完毕');
-            return;
-        }
+    showProgress(current, total) {
+        const container = document.getElementById('progress-container');
+        const currentEl = document.getElementById('progress-current');
+        const totalEl = document.getElementById('progress-total');
+        const fill = document.getElementById('progress-fill');
 
-        if (!confirm(`准备处理 ${pending.length} 个页面，确定继续吗？`)) return;
+        if (container && currentEl && totalEl && fill) {
+            container.classList.remove('hidden');
+            currentEl.textContent = current;
+            totalEl.textContent = total;
+            const percent = total > 0 ? (current / total) * 100 : 0;
+            fill.style.width = `${percent}%`;
+        }
+    }
+
+    hideProgress() {
+        const container = document.getElementById('progress-container');
+        if (container) {
+            container.classList.add('hidden');
+        }
+    }
+
+    async enhanceAllPages() {
+        if (!confirm(`准备增强全部 ${this.pages.length} 个页面，确定继续吗？`)) return;
 
         this.showVeil(true);
         this.btnEnhanceAll.disabled = true;
+        this.showProgress(0, this.pages.length);
 
         for (let i = 0; i < this.pages.length; i++) {
-            if (this.pages[i].status === 'done') continue;
-
             this.selectPage(i);
+            this.showProgress(i + 1, this.pages.length);
 
             try {
                 const formData = new FormData();
-                // Include watermark removal option from checkbox
                 const chkWatermark = document.getElementById('remove-watermark');
                 if (chkWatermark && chkWatermark.checked) {
                     formData.append('remove_watermark', 'true');
@@ -405,10 +420,11 @@ class SlideEditor {
             }
         }
 
+        this.hideProgress();
         this.showVeil(false);
         this.btnEnhanceAll.disabled = false;
         this.selectPage(0);
-        alert('批量处理完成');
+        alert('批量增强完成！');
     }
 
     async exportAs(format) {
@@ -539,18 +555,15 @@ class SlideEditor {
     async applyTemplateToAll() {
         if (!this.hasTemplate || !this.sessionId) return;
 
-        const pending = this.pages.filter(p => p.status !== 'done');
-        if (pending.length === 0) {
-            if (!confirm('所有页面已处理，是否重新应用模板到全部页面？')) return;
-        } else {
-            if (!confirm(`准备应用模板到 ${this.pages.length} 个页面，确定继续吗？`)) return;
-        }
+        if (!confirm(`准备应用模板到全部 ${this.pages.length} 个页面，确定继续吗？`)) return;
 
         this.showVeil(true);
         this.btnApplyTemplateAll.disabled = true;
+        this.showProgress(0, this.pages.length);
 
         for (let i = 0; i < this.pages.length; i++) {
             this.selectPage(i);
+            this.showProgress(i + 1, this.pages.length);
 
             try {
                 const res = await fetch(`/api/sessions/${this.sessionId}/apply-template/${this.pages[i].id}`, {
@@ -569,6 +582,7 @@ class SlideEditor {
             }
         }
 
+        this.hideProgress();
         this.showVeil(false);
         this.btnApplyTemplateAll.disabled = false;
         this.selectPage(0);
